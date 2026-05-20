@@ -1,41 +1,38 @@
+# Import python packages
 import streamlit as st
+from snowflake.snowpark.context import get_active_session
+from snowflake.snowpark.functions import col
+# Write directly to the app
+st.title(f":cup_with_straw: Customize Your Smoothie! :cup_with_straw: ")
+st.write(
+  """Choose the fruits you want in your custom Smoothie!
+  """
+)
+name_on_order=st.text_input('Name on Smoothie:')
+st.write('The name on your Smoothie will be:', name_on_order)
 
-st.title("🍹 Melanie's Smoothies")
 
-st.header("Welcome to our smoothie shop!")
+session = get_active_session()
+my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
+st.dataframe(data=my_dataframe, use_container_width=True)
 
-# Add a simple form
-with st.form("smoothie_form"):
-    st.write("Order your favorite smoothie:")
-    
-    smoothie_choice = st.selectbox(
-        "Choose a smoothie:",
-        ["Strawberry Banana", "Mango Pineapple", "Mixed Berry", "Green Smoothie"]
-    )
-    
-    size = st.radio(
-        "Select size:",
-        ["Small", "Medium", "Large"]
-    )
-    
-    submitted = st.form_submit_button("Order Now")
-    
-    if submitted:
-        st.success(f"Great choice! You ordered a {size} {smoothie_choice} 🎉")
+ingredients_list=st.multiselect(
+    'Choose up to 5 ingredients:', my_dataframe,max_selections=5
+)
+if ingredients_list:
+    #st.write(ingredients_list)
+    #st.text(ingredients_list)
 
-st.divider()
+    ingredients_string=''
 
-st.write("### Our Menu")
-col1, col2, col3 = st.columns(3)
+    for fruit_chosen in ingredients_list:
+        ingredients_string+= fruit_chosen+' '
+    #st.write(ingredients_string)
 
-with col1:
-    st.write("**Strawberry Banana**")
-    st.write("Fresh strawberries and ripe bananas")
+    my_insert_stmt = """ insert into smoothies.public.orders(ingredients, name_on_order)
+                    values ('""" + ingredients_string + """','""" + name_on_order + """')"""
 
-with col2:
-    st.write("**Mango Pineapple**")
-    st.write("Tropical blend with mango and pineapple")
-
-with col3:
-    st.write("**Mixed Berry**")
-    st.write("Blueberries, raspberries, and blackberries")
+    time_to_insert=st.button('Submit Order')
+    if time_to_insert:
+        session.sql(my_insert_stmt).collect()
+        st.success('Your Smoothie is ordered, '+name_on_order+'!', icon="✅")
